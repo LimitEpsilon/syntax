@@ -58,12 +58,6 @@ val [@inline always] double_field : t -> int -> float  (* @since 3.11.2 *)
 val [@inline always] set_double_field : t -> int -> float -> unit
   (* @since 3.11.2 *)
 
-external raw_field : t -> int -> raw_data = "caml_obj_raw_field"
-  (* @since 4.12 *)
-external set_raw_field : t -> int -> raw_data -> unit
-                                          = "caml_obj_set_raw_field"
-  (* @since 4.12 *)
-
 external new_block : int -> int -> t = "caml_obj_block"
 external dup : t -> t = "caml_obj_dup"
 external add_offset : t -> Int32.t -> t = "caml_obj_add_offset"
@@ -92,6 +86,7 @@ val int_tag : int
 val out_of_heap_tag : int
 val unaligned_tag : int   (* should never happen @since 3.11.0 *)
 
+(*
 module Closure : sig
   type info = {
     arity: int;
@@ -99,6 +94,7 @@ module Closure : sig
   }
   val info : t -> info
 end
+*)
 
 module Extension_constructor :
 sig

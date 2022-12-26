@@ -30,7 +30,7 @@
     with a {!Mutex.t}).
 *)
 
-type !'a t
+type 'a t
 (** The type of queues containing elements of type ['a]. *)
 
 

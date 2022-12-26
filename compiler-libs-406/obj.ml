@@ -35,9 +35,6 @@ external floatarray_set :
 let [@inline always] double_field x i = floatarray_get (obj x : floatarray) i
 let [@inline always] set_double_field x i v =
   floatarray_set (obj x : floatarray) i v
-external raw_field : t -> int -> raw_data = "caml_obj_raw_field"
-external set_raw_field : t -> int -> raw_data -> unit
-                                          = "caml_obj_set_raw_field"
 
 external new_block : int -> int -> t = "caml_obj_block"
 external dup : t -> t = "caml_obj_dup"
@@ -68,6 +65,7 @@ let int_tag = 1000
 let out_of_heap_tag = 1001
 let unaligned_tag = 1002
 
+(*
 module Closure = struct
   type info = {
     arity: int;
@@ -94,6 +92,7 @@ module Closure = struct
     assert (tag obj = closure_tag);
     info_of_raw (raw_field obj 1)
 end
+*)
 
 module Extension_constructor =
 struct
