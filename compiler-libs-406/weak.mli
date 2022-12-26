@@ -18,27 +18,31 @@
 
 (** {1 Low-level functions} *)
 
-type 'a t
+type !'a t
 (** The type of arrays of weak pointers (weak arrays).  A weak
    pointer is a value that the garbage collector may erase whenever
    the value is not used any more (through normal pointers) by the
-   program.  Note that finalisation functions are run after the
-   weak pointers are erased.
+   program.  Note that finalisation functions are run before the
+   weak pointers are erased, because the finalisation functions
+   can make values alive again (before 4.03 the finalisation
+   functions were run after).
 
    A weak pointer is said to be full if it points to a value,
    empty if the value was erased by the GC.
 
    Notes:
    - Integers are not allocated and cannot be stored in weak arrays.
-   - Weak arrays cannot be marshaled using {!Pervasives.output_value}
+   - Weak arrays cannot be marshaled using {!Stdlib.output_value}
      nor the functions of the {!Marshal} module.
 *)
 
 
 val create : int -> 'a t
 (** [Weak.create n] returns a new weak array of length [n].
-   All the pointers are initially empty.  Raise [Invalid_argument]
-   if [n] is negative or greater than {!Sys.max_array_length}[-1].*)
+   All the pointers are initially empty.
+   @raise Invalid_argument
+   if [n] is not comprised between zero and
+   {!Obj.Ephemeron.max_ephe_length} (limits included).*)
 
 val length : 'a t -> int
 (** [Weak.length ar] returns the length (number of elements) of
@@ -48,14 +52,14 @@ val set : 'a t -> int -> 'a option -> unit
 (** [Weak.set ar n (Some el)] sets the [n]th cell of [ar] to be a
    (full) pointer to [el]; [Weak.set ar n None] sets the [n]th
    cell of [ar] to empty.
-   Raise [Invalid_argument "Weak.set"] if [n] is not in the range
-   0 to {!Weak.length}[ a - 1].*)
+   @raise Invalid_argument if [n] is not in the range
+   0 to {!Weak.length}[ ar - 1].*)
 
 val get : 'a t -> int -> 'a option
 (** [Weak.get ar n] returns None if the [n]th cell of [ar] is
    empty, [Some x] (where [x] is the value) if it is full.
-   Raise [Invalid_argument "Weak.get"] if [n] is not in the range
-   0 to {!Weak.length}[ a - 1].*)
+   @raise Invalid_argument if [n] is not in the range
+   0 to {!Weak.length}[ ar - 1].*)
 
 val get_copy : 'a t -> int -> 'a option
 (** [Weak.get_copy ar n] returns None if the [n]th cell of [ar] is
@@ -65,8 +69,8 @@ val get_copy : 'a t -> int -> 'a option
    difference with [get] is that [get_copy] does not prevent
    the incremental GC from erasing the value in its current cycle
    ([get] may delay the erasure to the next GC cycle).
-   Raise [Invalid_argument "Weak.get"] if [n] is not in the range
-   0 to {!Weak.length}[ a - 1].
+   @raise Invalid_argument if [n] is not in the range
+   0 to {!Weak.length}[ ar - 1].
 
    If the element is a custom block it is not copied.
 
@@ -76,18 +80,21 @@ val get_copy : 'a t -> int -> 'a option
 val check : 'a t -> int -> bool
 (** [Weak.check ar n] returns [true] if the [n]th cell of [ar] is
    full, [false] if it is empty.  Note that even if [Weak.check ar n]
-   returns [true], a subsequent {!Weak.get}[ ar n] can return [None].*)
+   returns [true], a subsequent {!Weak.get}[ ar n] can return [None].
+   @raise Invalid_argument if [n] is not in the range
+   0 to {!Weak.length}[ ar - 1].*)
 
 val fill : 'a t -> int -> int -> 'a option -> unit
 (** [Weak.fill ar ofs len el] sets to [el] all pointers of [ar] from
-   [ofs] to [ofs + len - 1].  Raise [Invalid_argument "Weak.fill"]
-   if [ofs] and [len] do not designate a valid subarray of [a].*)
+   [ofs] to [ofs + len - 1].
+   @raise Invalid_argument
+   if [ofs] and [len] do not designate a valid subarray of [ar].*)
 
 val blit : 'a t -> int -> 'a t -> int -> int -> unit
 (** [Weak.blit ar1 off1 ar2 off2 len] copies [len] weak pointers
    from [ar1] (starting at [off1]) to [ar2] (starting at [off2]).
    It works correctly even if [ar1] and [ar2] are the same.
-   Raise [Invalid_argument "Weak.blit"] if [off1] and [len] do
+   @raise Invalid_argument if [off1] and [len] do
    not designate a valid subarray of [ar1], or if [off2] and [len]
    do not designate a valid subarray of [ar2].*)
 
@@ -107,6 +114,14 @@ val blit : 'a t -> int -> 'a t -> int -> int -> unit
     the values and give the same result as with the values themselves.
     *)
 
+(** {b Unsynchronized accesses}
+
+    Unsynchronized accesses to weak hash sets are a programming error.
+    Unsynchronized accesses to a weak hash set may lead to an invalid weak hash
+    set state. Thus, concurrent accesses to weak hash sets must be synchronized
+    (for instance with a {!Mutex.t}).
+*)
+
 module type S = sig
   type data
   (** The type of the elements stored in the table. *)
@@ -114,7 +129,7 @@ module type S = sig
   type t
     (** The type of tables that contain elements of type [data].
         Note that weak hash sets cannot be marshaled using
-        {!Pervasives.output_value} or the functions of the {!Marshal}
+        {!Stdlib.output_value} or the functions of the {!Marshal}
         module. *)
 
   val create : int -> t
@@ -139,7 +154,7 @@ module type S = sig
 
   val find : t -> data -> data
     (** [find t x] returns an instance of [x] found in [t].
-        Raise [Not_found] if there is no such element. *)
+        @raise Not_found if there is no such element. *)
 
   val find_opt: t -> data -> data option
     (** [find_opt t x] returns an instance of [x] found in [t]

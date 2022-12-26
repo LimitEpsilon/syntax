@@ -15,24 +15,61 @@
 
 (** Weak array operations *)
 
-type 'a t
+type !'a t
 
 external create : int -> 'a t = "caml_weak_create"
 
-(** number of additional values in a weak pointer *)
-let additional_values = 2
+(** number of additional values in a weak pointer
+ *    - Link
+ *    - Data *)
+let additional_values = 2 (* CAML_EPHE_FIRST_KEY in weak.h *)
+
+let create l =
+  if not (0 <= l && l <= Obj.Ephemeron.max_ephe_length) then
+    invalid_arg("Weak.create");
+  create l
+
 
 let length x = Obj.size(Obj.repr x) - additional_values
 
-external set : 'a t -> int -> 'a option -> unit = "caml_weak_set"
+let raise_if_invalid_offset e o msg =
+  if not (0 <= o && o < length e) then
+    invalid_arg(msg)
+
+external set' : 'a t -> int -> 'a -> unit = "caml_ephe_set_key"
+external unset : 'a t -> int -> unit = "caml_ephe_unset_key"
+let set e o x =
+  raise_if_invalid_offset e o "Weak.set";
+  match x with
+  | None -> unset e o
+  | Some x -> set' e o x
+
 external get : 'a t -> int -> 'a option = "caml_weak_get"
+let get e o =
+  raise_if_invalid_offset e o "Weak.get";
+  get e o
+
 external get_copy : 'a t -> int -> 'a option = "caml_weak_get_copy"
+let get_copy e o =
+  raise_if_invalid_offset e o "Weak.get_copy";
+  get_copy e o
+
 external check : 'a t -> int -> bool = "caml_weak_check"
+let check e o =
+  raise_if_invalid_offset e o "Weak.check";
+  check e o
+
 external blit : 'a t -> int -> 'a t -> int -> int -> unit = "caml_weak_blit"
+
 (* blit: src srcoff dst dstoff len *)
+let blit e1 o1 e2 o2 l =
+  if l < 0 || o1 < 0 || o1 > length e1 - l
+     || o2 < 0 || o2 > length e2 - l
+  then invalid_arg "Weak.blit"
+  else if l <> 0 then blit e1 o1 e2 o2 l
 
 let fill ar ofs len x =
-  if ofs < 0 || len < 0 || ofs + len > length ar
+  if ofs < 0 || len < 0 || ofs > length ar - len
   then raise (Invalid_argument "Weak.fill")
   else begin
     for i = ofs to (ofs + len - 1) do
@@ -141,7 +178,7 @@ module Make (H : Hashtbl.HashedType) : (S with type data = H.t) = struct
     Array.fold_right (count_bucket 0) t.table 0
 
 
-  let next_sz n = min (3 * n / 2 + 3) Sys.max_array_length
+  let next_sz n = Int.min (3 * n / 2 + 3) Sys.max_array_length
   let prev_sz n = ((n - 3) * 2 + 2) / 3
 
   let test_shrink_bucket t =
@@ -166,8 +203,10 @@ module Make (H : Hashtbl.HashedType) : (S with type data = H.t) = struct
         t.table.(t.rover) <- emptybucket;
         t.hashes.(t.rover) <- [| |];
       end else begin
-        Obj.truncate (Obj.repr bucket) (prev_len + additional_values);
-        Obj.truncate (Obj.repr hbucket) prev_len;
+        let newbucket = weak_create prev_len in
+        blit bucket 0 newbucket 0 prev_len;
+        t.table.(t.rover) <- newbucket;
+        t.hashes.(t.rover) <- Array.sub hbucket 0 prev_len
       end;
       if len > t.limit && prev_len <= t.limit then t.oversize <- t.oversize - 1;
     end;
@@ -202,7 +241,7 @@ module Make (H : Hashtbl.HashedType) : (S with type data = H.t) = struct
     let rec loop i =
       if i >= sz then begin
         let newsz =
-          min (3 * sz / 2 + 3) (Sys.max_array_length - additional_values)
+          Int.min (3 * sz / 2 + 3) (Sys.max_array_length - additional_values)
         in
         if newsz <= sz then failwith "Weak.Make: hash bucket cannot grow more";
         let newbucket = weak_create newsz in

@@ -16,13 +16,21 @@
 (** First-in first-out queues.
 
    This module implements queues (FIFOs), with in-place modification.
-
-   {b Warning} This module is not thread-safe: each {!Queue.t} value
-   must be protected from concurrent access (e.g. with a [Mutex.t]).
-   Failure to do so can lead to a crash.
 *)
 
-type 'a t
+(** {b Unsynchronized accesses} *)
+
+[@@@alert unsynchronized_access
+    "Unsynchronized accesses to queues are a programming error."
+]
+
+(**
+    Unsynchronized accesses to a queue may lead to an invalid queue state.
+    Thus, concurrent accesses to queues must be synchronized (for instance
+    with a {!Mutex.t}).
+*)
+
+type !'a t
 (** The type of queues containing elements of type ['a]. *)
 
 
@@ -43,12 +51,22 @@ val take : 'a t -> 'a
 (** [take q] removes and returns the first element in queue [q],
    or raises {!Empty} if the queue is empty. *)
 
+val take_opt : 'a t -> 'a option
+(** [take_opt q] removes and returns the first element in queue [q],
+   or returns [None] if the queue is empty.
+   @since 4.08 *)
+
 val pop : 'a t -> 'a
 (** [pop] is a synonym for [take]. *)
 
 val peek : 'a t -> 'a
 (** [peek q] returns the first element in queue [q], without removing
    it from the queue, or raises {!Empty} if the queue is empty. *)
+
+val peek_opt : 'a t -> 'a option
+(** [peek_opt q] returns the first element in queue [q], without removing
+   it from the queue, or returns [None] if the queue is empty.
+   @since 4.08 *)
 
 val top : 'a t -> 'a
 (** [top] is a synonym for [peek]. *)
@@ -80,3 +98,19 @@ val transfer : 'a t -> 'a t -> unit
    the queue [q2], then clears [q1]. It is equivalent to the
    sequence [iter (fun x -> add x q2) q1; clear q1], but runs
    in constant time. *)
+
+(** {1 Iterators} *)
+
+val to_seq : 'a t -> 'a Seq.t
+(** Iterate on the queue, in front-to-back order.
+    The behavior is not specified if the queue is modified
+    during the iteration.
+    @since 4.07 *)
+
+val add_seq : 'a t -> 'a Seq.t -> unit
+(** Add the elements from a sequence to the end of the queue.
+    @since 4.07 *)
+
+val of_seq : 'a Seq.t -> 'a t
+(** Create a queue from a sequence.
+    @since 4.07 *)

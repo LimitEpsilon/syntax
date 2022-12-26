@@ -24,7 +24,15 @@
    Performance notice: values of type [int32] occupy more memory
    space than values of type [int], and arithmetic operations on
    [int32] are generally slower than those on [int].  Use [int32]
-   only when the application requires exact 32-bit arithmetic. *)
+   only when the application requires exact 32-bit arithmetic.
+
+    Literals for 32-bit integers are suffixed by l:
+    {[
+      let zero: int32 = 0l
+      let one: int32 = 1l
+      let m_one: int32 = -1l
+    ]}
+*)
 
 val zero : int32
 (** The 32-bit integer 0. *)
@@ -48,15 +56,28 @@ external mul : int32 -> int32 -> int32 = "%int32_mul"
 (** Multiplication. *)
 
 external div : int32 -> int32 -> int32 = "%int32_div"
-(** Integer division.  Raise [Division_by_zero] if the second
-   argument is zero.  This division rounds the real quotient of
-   its arguments towards zero, as specified for {!Pervasives.(/)}. *)
+(** Integer division. This division rounds the real quotient of
+   its arguments towards zero, as specified for {!Stdlib.(/)}.
+   @raise Division_by_zero if the second
+   argument is zero.  *)
+
+val unsigned_div : int32 -> int32 -> int32
+(** Same as {!div}, except that arguments and result are interpreted as {e
+    unsigned} 32-bit integers.
+
+    @since 4.08.0 *)
 
 external rem : int32 -> int32 -> int32 = "%int32_mod"
 (** Integer remainder.  If [y] is not zero, the result
    of [Int32.rem x y] satisfies the following property:
    [x = Int32.add (Int32.mul (Int32.div x y) y) (Int32.rem x y)].
    If [y = 0], [Int32.rem x y] raises [Division_by_zero]. *)
+
+val unsigned_rem : int32 -> int32 -> int32
+(** Same as {!rem}, except that arguments and result are interpreted as {e
+    unsigned} 32-bit integers.
+
+    @since 4.08.0 *)
 
 val succ : int32 -> int32
 (** Successor.  [Int32.succ x] is [Int32.add x Int32.one]. *)
@@ -65,7 +86,8 @@ val pred : int32 -> int32
 (** Predecessor.  [Int32.pred x] is [Int32.sub x Int32.one]. *)
 
 val abs : int32 -> int32
-(** Return the absolute value of its argument. *)
+(** [abs x] is the absolute value of [x]. On [min_int] this
+   is [min_int] itself and thus remains negative. *)
 
 val max_int : int32
 (** The greatest representable 32-bit integer, 2{^31} - 1. *)
@@ -104,7 +126,8 @@ external shift_right_logical : int32 -> int -> int32 = "%int32_lsr"
 
 external of_int : int -> int32 = "%int32_of_int"
 (** Convert the given integer (type [int]) to a 32-bit integer
-    (type [int32]). *)
+    (type [int32]). On 64-bit platforms, the argument is taken
+    modulo 2{^32}. *)
 
 external to_int : int32 -> int = "%int32_to_int"
 (** Convert the given 32-bit integer (type [int32]) to an
@@ -113,13 +136,21 @@ external to_int : int32 -> int = "%int32_to_int"
    during the conversion.  On 64-bit platforms, the conversion
    is exact. *)
 
+val unsigned_to_int : int32 -> int option
+(** Same as {!to_int}, but interprets the argument as an {e unsigned} integer.
+    Returns [None] if the unsigned value of the argument cannot fit into an
+    [int].
+
+    @since 4.08.0 *)
+
 external of_float : float -> int32
   = "caml_int32_of_float" "caml_int32_of_float_unboxed"
   [@@unboxed] [@@noalloc]
 (** Convert the given floating-point number to a 32-bit integer,
    discarding the fractional part (truncate towards 0).
-   The result of the conversion is undefined if, after truncation,
-   the number is outside the range \[{!Int32.min_int}, {!Int32.max_int}\]. *)
+   If the truncated floating-point number is outside the range
+   \[{!Int32.min_int}, {!Int32.max_int}\], no exception is raised, and
+   an unspecified, platform-dependent integer is returned. *)
 
 external to_float : int32 -> float
   = "caml_int32_to_float" "caml_int32_to_float_unboxed"
@@ -128,7 +159,7 @@ external to_float : int32 -> float
 
 external of_string : string -> int32 = "caml_int32_of_string"
 (** Convert the given string to a 32-bit integer.
-   The string is read in decimal (by default, or if the string 
+   The string is read in decimal (by default, or if the string
    begins with [0u]) or in hexadecimal, octal or binary if the
    string begins with [0x], [0o] or [0b] respectively.
 
@@ -139,7 +170,7 @@ external of_string : string -> int32 = "caml_int32_of_string"
 
    The [_] (underscore) character can appear anywhere in the string
    and is ignored.
-   Raise [Failure "Int32.of_string"] if the given string is not
+   @raise Failure if the given string is not
    a valid representation of an integer, or if the integer represented
    exceeds the range of integers representable in type [int32]. *)
 
@@ -176,14 +207,22 @@ val compare: t -> t -> int
     allows the module [Int32] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 
+val unsigned_compare: t -> t -> int
+(** Same as {!compare}, except that arguments are interpreted as {e unsigned}
+    32-bit integers.
+
+    @since 4.08.0 *)
+
 val equal: t -> t -> bool
 (** The equal function for int32s.
     @since 4.03.0 *)
 
-(**/**)
+val min: t -> t -> t
+(** Return the smaller of the two arguments.
+    @since 4.13.0
+*)
 
-(** {1 Deprecated functions} *)
-
-external format : string -> int32 -> string = "caml_int32_format"
-(** Do not use this deprecated function.  Instead,
-   used {!Printf.sprintf} with a [%l...] format. *)
+val max: t -> t -> t
+(** Return the greater of the two arguments.
+    @since 4.13.0
+ *)
